@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.appcompat.widget.ToolbarWidgetWrapper;
+import androidx.lifecycle.Observer;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -15,20 +16,25 @@ import android.view.View;
 
 import com.android.roompractice.adapters.NotesRecyclerAdapter;
 import com.android.roompractice.models.Note;
+import com.android.roompractice.persistence.NoteRepository;
 import com.android.roompractice.util.VerticalItemSpacingDecorator;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements NotesRecyclerAdapter.OnNoteListener,
         View.OnClickListener {
-
     private static final String TAG = "MainActivity";
-    private ArrayList<Note> mNotes = new ArrayList<>();
+
+    //Ui Components
     private RecyclerView mRecyclerView;
 
-
+    //Variables
+    private ArrayList<Note> mNotes = new ArrayList<>();
     NotesRecyclerAdapter mNotesRecyclerAdapter;
+    private NoteRepository mNoteRepository;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,13 +42,35 @@ public class MainActivity extends AppCompatActivity implements NotesRecyclerAdap
         setContentView(R.layout.activity_main);
 
         mRecyclerView = findViewById(R.id.recycler_view);
-
+        mNoteRepository = new NoteRepository(this);
         findViewById(R.id.fab).setOnClickListener(this);
 
         initRecyclerView();
-        insertFakeNotes();
+        retrieveNotes();
+        //insertFakeNotes();
+
+        Log.d(TAG, "onCreate: Thread: " + Thread.currentThread().getName());
 
 
+    }
+
+    /* this method will listen to the database. The Observer will notify and update whenever
+     the database is changed. */
+    private void retrieveNotes(){
+        mNoteRepository.retrieveNoteTask().observe(this, new Observer<List<Note>>() {
+            @Override
+            public void onChanged(List<Note> notes) {
+                // if there is notes in the list I want to clear them because
+                // I am querying the list again.
+                if(notes.size() > 0){
+                    mNotes.clear();
+                } if(mNotes != null){
+                    mNotes.addAll(notes);
+                }
+                // Tell your adapter the dataset has changed so it updates the View.
+                mNotesRecyclerAdapter.notifyDataSetChanged();
+            }
+        });
     }
 
     private void insertFakeNotes() {
@@ -87,6 +115,8 @@ public class MainActivity extends AppCompatActivity implements NotesRecyclerAdap
     private void deleteNote(Note note){
         mNotes.remove(note);
         mNotesRecyclerAdapter.notifyDataSetChanged();
+
+        mNoteRepository.deleteNote(note);
     }
 
     private ItemTouchHelper.SimpleCallback itemTouchHelperCallback
